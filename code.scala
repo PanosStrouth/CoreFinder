@@ -215,16 +215,6 @@ object CoreFinder {
        1             2        
     */    
 
-    def Stages2(turn:Int,currentValues:RDD[(Int,Int)]): RDD[(Int,Int)]=
-    {
-        println(s"TURN=$turn")
-        val stage6=currentValues.map
-        {
-            case(vertexId,value)=>(vertexId,test(vertexId,value))
-        }
-        return stage6
-    }
-
     def Stages(turn:Int,neighbors :RDD[(Int,Int)] ,currentValues:RDD[(Int,Int)]): RDD[(Int,Int)]=
     {
       //STAGE1  RDD (join)
