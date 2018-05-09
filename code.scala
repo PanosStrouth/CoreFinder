@@ -27,21 +27,12 @@ object CoreFinder {
     // Create spark configuration and spark context
     val conf = new SparkConf().setAppName("CoreFinder App").setMaster("local[16]")
     val sc = new SparkContext(conf)
-//    println("1")
-/*
-    val ssc = new StreamingContext(sc,Seconds(1))
-    ssc.checkpoint("checkpoint")
-*/
+
     val currentDir = System.getProperty("user.dir") // get the current directory
     val edgeFile = "file://" + currentDir + "/friendsterUndirected.txt"
- //     println("2") 
 
     // Load the edges as a graph
     val graph = GraphLoader.edgeListFile(sc, edgeFile,false,1,StorageLevel.MEMORY_AND_DISK,StorageLevel.MEMORY_AND_DISK)
- // println("3")
-
-
-
 
     /*---------------------------------------------------------------------------------------------------------*/
     /*------------------------------------HELPING FUNCTIONS----------------------------------------------------*/
@@ -105,23 +96,14 @@ object CoreFinder {
       }
     }
 
-    def kbound(turn:Int,vertexId:VertexId,snvalues:Seq[Int],sn:Int):Int = {
-
-      //val arrayofSns=snvalues.splitAt(snvalues.size-1)
-      //val listOfNeighsSns = arrayofSns._1.toArray
-    val listOfNeighsSns = snvalues.toArray
-      //var leftPart= arrayofSns._2
-      //var maximalI=leftPart(0)
-      //val initialSn=leftPart(0)
+    def kbound(turn:Int,vertexId:VertexId,snvalues:Seq[Int],sn:Int):Int = 
+    {
+      val listOfNeighsSns = snvalues.toArray
       var maximalI=sn
       val initialSn=sn
 
-      //println(s"Searching in turn:$turn for new sn value for vertexId: $vertexId with former sn value: $initialSn")
-      
       if (maximalI == 0 || maximalI == 1)
       {
-    //println(s"vertexId: $vertexId has new sn value : $maximalI in turn:$turn")
-    //println("=========================")
         return maximalI //This means that the vertex has no neighbors
       }
 
@@ -130,24 +112,20 @@ object CoreFinder {
       {
         var count = listOfNeighsSns.count(_>=maximalI)
         if (count >= maximalI)
-    { 
-        if(maximalI<=initialSn)
-        {
-            //println(s"vertexId: $vertexId has new sn value : $maximalI")
-            //println("=========================")
+        { 
+           if(maximalI<=initialSn)
+           {
                   return maximalI
-        }
-        else//this should never happen
-        {
-            //println(s"Unreasonable new value for sn, previous sn value: $initialSn - new value:$maximalI")
+           }
+           else//this should never happen
+           {
             System.exit(1)
+           }
         }
-    }
         maximalI -= 1 //This makes the function quite late!! maximalI = the first smaller value than maximalI in sortedlistofSns
-        // maximalI =  sortedlistofSns(count)_2 <-- This is faulty!! It accelerates but it leads to underestimation even in large deviations!
-      }
-      return maximalI
-    }
+     }
+     return maximalI
+   }
 
     def SU2(input: Seq[Int]):Int = {
       val arrayofSns=input.splitAt(input.size-1)
@@ -166,17 +144,18 @@ object CoreFinder {
       var lastCriterionResult= false
 
       var flag = true
-      while(flag){
+      while(flag)
+      {
         counter=0;
         var i=0
 
-        if(listOfNeighsSns.count(_>=currentThres)>=currentThres){
+        if(listOfNeighsSns.count(_>=currentThres)>=currentThres)
+        {
           if(lastunsuccess==0)//return only if the first currentThres is exceeded
             return currentThres;
 
           lastCriterionResult = true;
           flag=false
-          //break
         }
         else{
           lastunsuccess = currentThres;
@@ -186,7 +165,8 @@ object CoreFinder {
 
       //try to optimize the result!!
       do{
-        if(lastCriterionResult){
+        if(lastCriterionResult)
+        {
           lastsuccess=currentThres;
           currentThres = lastsuccess+(lastunsuccess-lastsuccess)/2;
         }
@@ -204,17 +184,12 @@ object CoreFinder {
       return lastsuccess;
     }
 
-
-
-
     //***********************//
     //CORE FINDER DISTRIBUTED//
     //***********************//
 
     val EIds = graph.edges
     val degrees= createDegreesVertexRDD(graph)
-
-
     val neighbors=EIds.map{
       case(edge)=>(edge.srcId.asInstanceOf[Int],edge.dstId.asInstanceOf[Int])
     }//This is RDD2
@@ -240,144 +215,72 @@ object CoreFinder {
        1             2        
     */    
 
-    //neighbors.persist()
-
-    def    test(vertexId:Int,value:Int):Int={
-      println(s"Searching new sn value for vertexId: $vertexId with former sn value: $value")
-         
-    val newvalue = value-1
-
-      println(s"vertexId: $vertexId has new sn value : $newvalue")
-      println("=========================")
-    return newvalue
-    }
-
-    def Stages2(turn:Int,currentValues:RDD[(Int,Int)]): RDD[(Int,Int)]={
+    def Stages2(turn:Int,currentValues:RDD[(Int,Int)]): RDD[(Int,Int)]=
+    {
         println(s"TURN=$turn")
-    val stage6=currentValues.map{
+        val stage6=currentValues.map
+        {
             case(vertexId,value)=>(vertexId,test(vertexId,value))
-          }
+        }
         return stage6
     }
 
-    def Stages(turn:Int,neighbors :RDD[(Int,Int)] ,currentValues:RDD[(Int,Int)]): RDD[(Int,Int)]={
-    println(s"TURN=$turn")
+    def Stages(turn:Int,neighbors :RDD[(Int,Int)] ,currentValues:RDD[(Int,Int)]): RDD[(Int,Int)]=
+    {
       //STAGE1  RDD (join)
-    /*    
+      /*    
         Key Value(neighbor SnValue)
          1    4,2    
          1    2,2
          4    1,1
          2    1,1        
-    */    
-      //println("Stage1 started")
+      */    
       val stage1=neighbors.join(currentValues,16)
-      //println("Stage1 finished")
 
       // STAGE2 RDD (exclude key value of STAGE1 RDD)
       /*
         Key(VertexId) Value(Sn)
          4            2
-                 2            2
-                 1            1
-         1        1      
+         2            2
+         1            1
+         1            1      
       */    
-      //println("Stage2 started")
       val stage2=stage1.map{
         case(value,values)=>(values._1,values._2)
       }
-      //println("Stage2 finished")
       //STAGE3 RDD
-      //val stage3=stage2.groupByKey()
-      //groupByKey is not so good idea due to DataBricks!
-
-      //println("Stage31 started")
       val stage31=stage2.map{
         case(value1,value2)=>(value1,Seq(value2))
       }
-      //println("Stage31 finished")
-      //println("Stage32 started")
       val stage32=stage31.reduceByKey((x,y)=>(x++y))
-      //println("Stage32 finished")
-      // STAGE3 RDD (merge value by key)
-      /*
-        Key(VertexId) Sequence of Sn Values of VertexId's neighbors
-         4                Seq(2)
-                 2                Seq(2)
-                 1                Seq(1,1)     
-      */
-
- 
-      // STAGE4 RDD 
-      /*
-        Key(VertexId)   Sequence of Sn Values of VertexId's neighbors     SnValue
-         4                    Seq(2)                   1
-                 2                    Seq(2)                   1
-                 1                    Seq(1,1)                2 
-      */
-
-     //STAGE4 RDD
-      //val stage4=sc.union(stage3,initialValues.groupByKey())//stage3.union(initialValues.groupByKey())
-      // groupByKey is not so good idea due to DataBricks..it creates a lot of shuffling
-
-      /*
-      val currentValues1=currentValues.map{
-        case(value1,value2)=>(value1,Seq(value2))
-      }
-      */
-      //println("Stage4 started")
-      //val stage4=sc.union(stage32,currentValues1)
-      //println("Stage4 finished")
-
       val stage4=stage32.join(currentValues,16)    
-
-
-      //STAGE5 RDD. This RDD has the following format [VertexId, [Sn values of its neighbors] [VertexId's Sn value]]
-      //val stage5=stage4.groupByKey()//groupByKey is not so good idea due to DataBricks..it creates a lot of shuffling
-      //println("Stage5 started")
-      //val stage5=stage4.reduceByKey((x,y)=>(x++y))
-      //println("Stage5 finished")
-
-    //TESTING current SN VALUES before kbound
-       printResultToFile(currentValues,"currentSnsTurn"+turn+".txt")
+      printResultToFile(currentValues,"currentSnsTurn"+turn+".txt")
     //*******END OF TESTING SN VALUES******************
 
-      //println("Stage5 started")
       val stage6=stage4.map{
         case(vertexId,(snvalues,sn))=>(vertexId,kbound(turn,vertexId,snvalues,sn))
       }
-      //println("Stage5 finished")
-
       return stage6
-
-
-      //STAGE5 RDD. This RDD has the following format [VertexId, [Sn values of its neighbors] [VertexId's Sn value]]
-      //val stage5=stage4.groupByKey()//groupByKey is not so good idea due to DataBricks..it creates a lot of shuffling
     }
 
-    def Corefind(turn:Int): RDD[(Int,Int)]={
-
+    def Corefind(turn:Int): RDD[(Int,Int)]=
+    {
       val startTime = System.currentTimeMillis()
       val lastRDDfilename = "lastRDD" + (turn) + ".txt"
       val lastRDD: RDD[(Int, Int)] = sc.objectFile[(Int,Int)](lastRDDfilename)
-      //printResultToFile(lastRDD,"results"+turn+".txt")
       val newRDD = Stages(turn,neighbors,lastRDD)
 
       if (compare(newRDD, lastRDD)) {
         val newRDDfilename = "lastRDD" + (turn+1) + ".txt"
         newRDD.saveAsObjectFile(newRDDfilename)
         val endTime = System.currentTimeMillis()
-        //println("Turn elapsed:")
-        //println((endTime-startTime)/1000)
         return Corefind(turn + 1)
       }
       else
         return newRDD
-    //return lastRDD
     }
 
     val startTime = System.currentTimeMillis()
-
     initialValues.saveAsObjectFile("lastRDD0.txt")
 
     val results = Corefind(0)
